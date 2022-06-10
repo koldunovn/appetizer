@@ -213,7 +213,7 @@ model_lon = ds.lon.values
 model_lat = ds.lat.values
 
 logging.info('Remove nans')
-nonan = ~(np.isnan(model_lon) & np.isnan(model_lat)) 
+nonan = ~(np.isnan(model_lon) | np.isnan(model_lat)) 
 
 lat_nonan = model_lat[nonan]
 lon_nonan = model_lon[nonan]
