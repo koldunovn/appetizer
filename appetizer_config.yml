@@ -1,0 +1,25 @@
+experiment_id: 'tco3999-ng5'
+datapath: '/work/bm1235/a270046/cycle2-sync/tco3999-ng5/ICMGGall/'
+datazarr: '/work/bm1235/a270046/cycle2-sync/tco3999-ng5/ICMGGall/json.dir/atm2d.json'
+outpath: '/work/ab0995/a270088/NextGems_public/appetizer/IFS2.5/'
+
+sstart_in: 0
+sstop_in: 0
+
+variable_name: '2t'
+
+left: -180
+right: 180
+bottom: -90
+top: 90
+
+projection: "pc"
+res: [5400, 2700]
+cmap: balance
+vmin: 243
+vmax: 303
+
+textxy: [10, 2670]
+textsize: 30
+text_color: "white"
+dpi: 100
