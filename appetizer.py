@@ -14,7 +14,11 @@ import os.path
 import cmocean.cm as cmo
 import sys
 import yaml
+import logging
+from pprint import pformat
+import time
 
+logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
 def get_cmap(cmap=None):
     """Get the color map.
@@ -91,6 +95,30 @@ def create_indexes_and_distances(model_lon, model_lat, lons, lats, k=1, workers=
     return distances, inds
 
 def region_cartopy(box, res, projection="pc"):
+    """ Computes coordinates for the region 
+    Parameters
+    ----------
+    box : list
+        List of left, right, bottom, top boundaries of the region in -180 180 degree format
+    res: list
+        List of two variables, defining number of points along x and y
+    projection : str
+        Options are:
+            "pc" : cartopy PlateCarree
+            "mer": cartopy Mercator
+            "np" : cartopy NorthPolarStereo
+            "sp" : cartopy SouthPolarStereo
+    Returns
+    -------
+    x : numpy.array
+        1 d array of coordinate values along x
+    y : numpy.array
+        1 d array of coordinate values along y
+    lon : numpy.array
+        2 d array of longitudes
+    lat : numpy array
+        2 d array of latitudes
+    """
     if projection == "pc":
         projection_ccrs = ccrs.PlateCarree()
     if projection == "mer":
@@ -105,7 +133,7 @@ def region_cartopy(box, res, projection="pc"):
     else:
         lonNumber, latNumber = 500, 500
     left, right, down, up = box
-    print(left, right, down, up)
+    logging.info('Box %s, %s, %s, %s', left, right, down, up)
     fig, ax = plt.subplots(
         1,
         1,
@@ -122,16 +150,16 @@ def region_cartopy(box, res, projection="pc"):
     x = np.linspace(xmin, xmax, lonNumber)
     y = np.linspace(ymin, ymax, latNumber)
     x2d, y2d = np.meshgrid(x, y)
-    print(x.shape)
 
     npstere = ccrs.PlateCarree()
     transformed2 = npstere.transform_points(projection_ccrs, x2d, y2d)
     lon = transformed2[:, :, 0]  # .ravel()
     lat = transformed2[:, :, 1]  # .ravel()
-    print(lon.shape)
 
     return x, y, lon, lat
+    
 config_path = sys.argv[1]
+logging.info('Input file: %s', config_path)
 
 with open(config_path, "r") as stream:
     try:
@@ -139,8 +167,7 @@ with open(config_path, "r") as stream:
     except yaml.YAMLError as exc:
         print(exc)
 
-print(config)
-
+logging.debug(pformat(config))
 
 # json file was already prepared with gribscan-index and gribscan-build command line tools
 experiment_id = config['experiment_id']
@@ -178,33 +205,38 @@ if sstart_in==sstop_in:
 else:
     startstop = [int(sstart_in), int(sstop_in)]
     
-    
+
 ds = xr.open_zarr("reference::"+datazarr, consolidated=False)
 
+logging.info('Reading coordinates')
 model_lon = ds.lon.values
 model_lat = ds.lat.values
 
+logging.info('Remove nans')
 nonan = ~np.isnan(model_lon)
 
 lat_nonan = model_lat[nonan]
 lon_nonan = model_lon[nonan]
 
-
+logging.info('Getting the region')
 x, y, x2, y2 = region_cartopy([left, right, bottom, top], res, projection=projection)
 
-print(x)
+logging.info('Shape along x: %s', x.shape[0])
+logging.info('Shape along y: %s', y.shape[0])
+
 
 data = ds[variable_name]
 
 if os.path.isfile(path_to_inds):
     distances = np.load(path_to_dist)
     inds = np.load(path_to_inds)
-    print('loading dist and inds')
+    logging.info('loading dist and inds')
 else:
+    logging.info('Inds and dist do not exist, creating')
     distances, inds = create_indexes_and_distances(lon_nonan, lat_nonan, x2, y2, k=1, workers=10)
     np.save(path_to_dist, distances)
     np.save(path_to_inds, inds)
-    print('saving dist and inds')
+    loggin.info('saving dist and inds')
 
 if startstop is None:
     sstart = 0
@@ -213,13 +245,18 @@ else:
     sstart = startstop[0]
     sstop = startstop[1]
 
+logging.info('Start/stop time indexes: %s, %s', sstart, sstop)
+
 if not os.path.exists(f'{outpath}/{variable_name}/images/'):
     os.makedirs(f'{outpath}/{variable_name}/images/')
 
 if not os.path.exists(f'{outpath}/{variable_name}/netcdf/'):
     os.makedirs(f'{outpath}/{variable_name}/netcdf/')
-    
+
+logging.info('Start main loop')    
 for ttime in range(sstart, sstop):
+    start_time = time.time()
+    
     data_nan = data[ttime].values
     data_nonan = data_nan[nonan]
     interpolated_data_fesom = data_nonan[inds]
@@ -238,6 +275,7 @@ for ttime in range(sstart, sstop):
     ax.axis('off');
     ostrtime = strtime.replace(':','_')
     plt.savefig(f'{outpath}/{variable_name}/images/{experiment_id}_{projection}_{variable_name}_{ostrtime}_{str(ttime).zfill(5)}.png', dpi=dpi)
+    logging.info('Image created')
     fig.clear()
     plt.close(fig)
 #     plt.close()
@@ -263,7 +301,9 @@ for ttime in range(sstart, sstop):
             "latitude": {"dtype": np.dtype("double")},
             variable_name: {"zlib": True, "complevel": 1, "dtype": np.dtype("single")},
         },)
-
+    logging.info('NetCDF file created')
     del interpolated_data_fesom
     gc.collect()
-    print(ttime)
+    elapsed_time = time.time() - start_time
+    logging.info('Finish processing time step %s, %s, in %s',str(ttime).zfill(5), ostrtime, time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
+    
