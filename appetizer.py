@@ -197,8 +197,8 @@ textsize = config['textsize']
 text_color = config['text_color']
 dpi = config['dpi']
 
-path_to_dist = f'{outpath}/distances_{experiment_id}_{projection}_{res[0]}_{res[1]}.npy'
-path_to_inds = f'{outpath}/inds_{experiment_id}_{projection}_{res[0]}_{res[1]}.npy'
+path_to_dist = f'{outpath}/distances_{experiment_id}_{projection}_{left}_{right}_{bottom}_{top}_{res[0]}_{res[1]}.npy'
+path_to_inds = f'{outpath}/inds_{experiment_id}_{projection}_{left}_{right}_{bottom}_{top}_{res[0]}_{res[1]}.npy'
 
 if sstart_in==sstop_in:
     startstop = None
@@ -236,7 +236,7 @@ else:
     distances, inds = create_indexes_and_distances(lon_nonan, lat_nonan, x2, y2, k=1, workers=10)
     np.save(path_to_dist, distances)
     np.save(path_to_inds, inds)
-    loggin.info('saving dist and inds')
+    logging.info('saving dist and inds')
 
 if startstop is None:
     sstart = 0
