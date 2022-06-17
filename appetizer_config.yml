@@ -14,6 +14,7 @@ bottom: -90
 top: 90
 
 projection: "pc"
+coastlines: False
 res: [5400, 2700]
 cmap: balance
 vmin: 243
