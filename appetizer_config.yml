@@ -14,11 +14,14 @@ bottom: -90
 top: 90
 
 projection: "pc"
+# with coastlines things become slower, and you have to adjust textxy
+coastlines: False
 res: [5400, 2700]
 cmap: balance
 vmin: 243
 vmax: 303
 
+# text position defined in points, without coastlines, and in lon lat with coastlines
 textxy: [10, 2670]
 textsize: 30
 text_color: "white"
