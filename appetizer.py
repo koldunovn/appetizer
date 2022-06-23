@@ -5,6 +5,7 @@ import matplotlib.pylab as plt
 import numpy as np
 from matplotlib import cm
 import matplotlib as mpl
+mpl.use('Agg')
 import gc
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -94,6 +95,17 @@ def create_indexes_and_distances(model_lon, model_lat, lons, lats, k=1, workers=
 
     return distances, inds
 
+def proj_selection(projection):
+    if projection == "pc":
+        projection_ccrs = ccrs.PlateCarree()
+    if projection == "mer":
+        projection_ccrs = ccrs.Mercator()
+    elif projection == "np":
+        projection_ccrs = ccrs.NorthPolarStereo()
+    elif projection == "sp":
+        projection_ccrs = ccrs.SouthPolarStereo()
+    return projection_ccrs
+
 def region_cartopy(box, res, projection="pc"):
     """ Computes coordinates for the region 
     Parameters
@@ -119,14 +131,7 @@ def region_cartopy(box, res, projection="pc"):
     lat : numpy array
         2 d array of latitudes
     """
-    if projection == "pc":
-        projection_ccrs = ccrs.PlateCarree()
-    if projection == "mer":
-        projection_ccrs = ccrs.Mercator()
-    elif projection == "np":
-        projection_ccrs = ccrs.NorthPolarStereo()
-    elif projection == "sp":
-        projection_ccrs = ccrs.SouthPolarStereo()
+    projection_ccrs = proj_selection(projection)
 
     if not res is None:
         lonNumber, latNumber = res
@@ -155,7 +160,9 @@ def region_cartopy(box, res, projection="pc"):
     transformed2 = npstere.transform_points(projection_ccrs, x2d, y2d)
     lon = transformed2[:, :, 0]  # .ravel()
     lat = transformed2[:, :, 1]  # .ravel()
-
+    fig.clear()
+    plt.close(fig)
+   
     return x, y, lon, lat
     
 config_path = sys.argv[1]
@@ -186,6 +193,7 @@ bottom = config['bottom']
 top = config['top']
 
 projection = config['projection']
+coastlines = config['coastlines']
 res = config['res']
 
 cmap=get_cmap(config['cmap'])
@@ -261,17 +269,36 @@ for ttime in range(sstart, sstop):
     data_nonan = data_nan[nonan]
     interpolated_data_fesom = data_nonan[inds]
     interpolated_data_fesom.shape = x2.shape
-    
-    fig, ax = plt.subplots(
-                1,
-                1,
-                constrained_layout=True,
-                figsize=(res[0]/dpi, res[1]/dpi),
-            )
-
-    ax.imshow(np.flipud(interpolated_data_fesom), cmap=cmap, vmin=vmin, vmax=vmax)
     strtime = data[ttime].time.values.astype('str')[:16]
-    ax.text(textxy[0], textxy[1], f'{strtime} [{ttime}]', {'size':textsize, 'color':text_color})
+    
+    if coastlines:       
+        projection_ccrs = proj_selection(projection)
+        fig, ax = plt.subplots(
+                    1,
+                    1,
+                    subplot_kw=dict(projection=projection_ccrs),
+                    constrained_layout=True,
+                    figsize=(res[0]/dpi, res[1]/dpi),
+                )
+
+        ax.imshow(np.flipud(interpolated_data_fesom), cmap=cmap, vmin=vmin, vmax=vmax, 
+                  extent=(x.min(), x.max(), y.min(), y.max()),  transform=projection_ccrs)
+        ax.coastlines(resolution='50m')
+        print(textxy[0])
+        print(textxy[1])
+        ax.text(textxy[0], textxy[1], f'{strtime} [{ttime}]', {'size':textsize, 'color':text_color}, transform=ccrs.PlateCarree())
+    else:
+        fig, ax = plt.subplots(
+            1,
+            1,
+            constrained_layout=True,
+            figsize=(res[0]/dpi, res[1]/dpi),
+        )
+
+        ax.imshow(np.flipud(interpolated_data_fesom), cmap=cmap, vmin=vmin, vmax=vmax)
+        ax.text(textxy[0], textxy[1], f'{strtime} [{ttime}]', {'size':textsize, 'color':text_color})
+    
+    
     ax.axis('off');
     ostrtime = strtime.replace(':','_')
     plt.savefig(f'{outpath}/{variable_name}/images/{experiment_id}_{projection}_{variable_name}_{ostrtime}_{str(ttime).zfill(5)}.png', dpi=dpi)
